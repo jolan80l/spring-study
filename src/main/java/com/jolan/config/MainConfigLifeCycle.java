@@ -27,7 +27,13 @@ import org.springframework.context.annotation.Scope;
  *      指定init-method和destory-method
  *  2）通过让bean实现InitializingBean定义初始化逻辑
  *     通过让bean实现DisposableBean定义销毁逻辑
- */
+ *  3）JSR250
+ *      @PostConstruct:在bean创建完成并且属性赋值完成后，开执行初始化。
+ *      @PreDestroy：在容器销毁bean之前通知我们进行清理工作
+ *  4）BeanPostProcessor：bean的后置处理器，在bean初始化前后进行一些处理工作。
+ *      postProcessBeforeInitialization：在任何初始化工作之前调用
+ *      postProcessAfterInitialization：在所有初始化工作完成之后调用
+ * */
 @Configuration
 @ComponentScan("com.jolan")
 public class MainConfigLifeCycle {
