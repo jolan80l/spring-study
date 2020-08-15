@@ -33,6 +33,17 @@ import org.springframework.context.annotation.Scope;
  *  4）BeanPostProcessor：bean的后置处理器，在bean初始化前后进行一些处理工作。
  *      postProcessBeforeInitialization：在任何初始化工作之前调用
  *      postProcessAfterInitialization：在所有初始化工作完成之后调用
+ *
+ *      populateBean(beanName, mbd, instanceWrapper);
+ *      initializeBean：｛
+ *          遍历得到容器中所有的BeanPostProcessor:挨个执行BeforeInitialization，一旦返回null，跳出for循环，不会执行后面的BeanPostProcessor
+ *          applyBeanPostProcessorsBeforeInitialization(bean, beanName);
+ *          invokeInitMethods(beanName, wrappedBean, mbd);//执行初始化
+ *          applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
+ *      ｝
+ *
+ *  5）Spring底层对BeanPostProcessor的使用
+ *      bean赋值，注入其他组件，@Autowired，生命周期注解功能@PostConstruct，@Async等。
  * */
 @Configuration
 @ComponentScan("com.jolan")
