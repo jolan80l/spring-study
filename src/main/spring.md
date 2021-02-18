@@ -1044,6 +1044,505 @@ cat ...afterPropertiesSet...
 postProcessAfterInitialization...cat=>com.jolan.bean.Cat@5bd03f44
 ```
 
+# BeanPostProcessor小总结
+
+​		BeanPostProcessor是bean的后置处理器，在bean创建之后做一些后置操作。
+
++ postProcessBeforeInitialization：在任何初始化工作之前调用。
++ postProcessAfterInitialization：在所有初始化工作完成之后调用。
+
+​		在整个bean的生命周期中，处于下面的位置。populateBean是构建一个bean对象，然后是调用postProcessBeforeInitialization，接着调用bean自身的初始化方法，最后调用postProcessAfterInitialization。
+
+```java
+populateBean(beanName, mbd, instanceWrapper);
+       initializeBean：｛
+           //遍历得到容器中所有的BeanPostProcessor:挨个执行BeforeInitialization，一旦返回null，跳出for循环，不会执行后面的BeanPostProcessor
+           applyBeanPostProcessorsBeforeInitialization(bean, beanName);
+           invokeInitMethods(beanName, wrappedBean, mbd);//执行初始化
+           applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
+       ｝
+```
+
+​		在spring底层，也有对BeanPostProcessor的大量使用。如：
+
++ bean赋值
++ 注入其他组件
++ @Autowired
++ 生命周期注解功能@PostConstruct
++ @Async等
+
+# @Value
+
+​		使用@Value给bean的属性赋值。
+
+## 增加配置文件
+
+​		在resources下创建person.properties配置文件。
+
+```properties
+person.nickName = 小张三
+```
+
+## 创建配置类
+
+```java
+@PropertySource(value={"classpath:/person.properties"})//使用@PropertySource读取外部配置文件的属性，保存到运行的环境变量中
+@Configuration
+public class MainConfigOfPropertyValues {
+    @Bean
+    public Person person(){
+        return new Person();
+    }
+}
+```
+
+## 修改Person类
+
+```java
+public class Person {
+    /**
+     * 使用@Value复制
+     * 1.基本数值
+     * 2.可以写SpEL：#{}
+     * 3.可以写${}，取出配置文件中的值(在运行环境变量的值)
+     * */
+
+    @Value("张三")
+    private String name;
+    @Value("#{20 - 2}")
+    private Integer age;
+    @Value("${person.nickName}")
+    private String nickName;
+    //Getter Setter toString 
+}
+```
+
+## 测试结果
+
+​		可以看到输出的person属性为是张三和18.
+
+```java
+@Test
+public void test01(){
+    AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfigLifeCycle.class);
+    System.out.println("容器创建完成...");
+
+    applicationContext.getBean("car");
+    //关闭容器
+    applicationContext.close();
+}
+```
+
+```java
+******忽略spring自身组件*******
+mainConfigOfPropertyValues
+person
+==================
+Person{name='张三', age=18, nickName='小张三'}
+小张三
+```
+
+# 自动装配
+
+## @Autowired
+
+### 修改controller等类
+
+​		在前面的学习中创建了几个bean分别为BookContoller,BookService,BookDao，现在对其进行修改。
+
+#### BookController
+
+```java
+@Controller
+public class BookController {
+    @Autowired
+    private BookController bookController;
+}
+```
+
+#### BookService
+
+```java
+@Service
+public class BookService {
+    @Autowired
+    private BookDao bookDao;
+
+    public void print(){
+        System.out.println(bookDao);
+    }
+}
+```
+
+### 添加新配置类
+
+```java
+@Configuration
+@ComponentScan({"com.jolan.com.jolan.controller", "com.jolan.com.jolan.service", "com.jolan.com.jolan.dao"})
+public class MainConfigOfAutowired {
+
+}
+```
+
+### 添加测试类及运行结果
+
+​		可以看到BookService中自动装配的BookDao对象和从容器中直接过去的BookDao对象是相同的。
+
+```java
+AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfigOfAutowired.class);
+@Test
+public void test01(){
+    BookService bookService = (BookService)applicationContext.getBean(BookService.class);
+    bookService.print();
+
+    BookDao bookDao = (BookDao)applicationContext.getBean(BookDao.class);
+    System.out.println(bookDao);
+}
+```
+
+```java
+com.jolan.com.jolan.dao.BookDao@20d28811
+com.jolan.com.jolan.dao.BookDao@20d28811
+```
+
+### 多个相同类型组件情况
+
+#### 修改BookDao类
+
+```java
+@Repository
+public class BookDao {
+    private String label = "1";
+
+    public String getLabel() {
+        return label;
+    }
+
+    public void setLabel(String label) {
+        this.label = label;
+    }
+
+    @Override
+    public String toString() {
+        return "BookDao{" +
+                "label='" + label + '\'' +
+                '}';
+    }
+}
+```
+
+#### 修改配置类
+
+​		在配置类中注册一个id为bookDao2的组件。此时容器中有两个类型为BookDao的组件，一个是通过组件扫描注册的bookDao，还有当前通过@Bean注册的bookDao2
+
+```java
+@Bean("bookDao2")
+public BookDao bookDao(){
+    BookDao bookDao = new BookDao();
+    bookDao.setLabel("2");
+    return bookDao;
+}
+```
+
+#### 修改测试类并运行
+
+​		运行结果是BookService中注入的是id为bookDao的组件。也就是说，当有多个相同类型的组件被@Autowired注入的时候，会用组件名作为id到容器中查找，如果找到则用applicationContext.getBean("id")方式注入。
+
+```java
+AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfigOfAutowired.class);
+@Test
+public void test01(){
+    BookService bookService = (BookService)applicationContext.getBean(BookService.class);
+    bookService.print();
+
+    //        BookDao bookDao = (BookDao)applicationContext.getBean(BookDao.class);
+    //        System.out.println(bookDao);
+}
+```
+
+```java
+BookDao{label='1'}
+```
+
+#### @Qualifier
+
+​		使用@Qualifier指定需要装备的组件id，而不是使用属性名。如在这个例子中，我们想使用bookDao2这个组件注入到BookService对象中，可以使用这个注解。需要修改BookService类。
+
+```java
+@Service
+public class BookService {
+    @Qualifier("bookDao2")
+    @Autowired
+    private BookDao bookDao;
+
+    public void print(){
+        System.out.println(bookDao);
+    }
+}
+```
+
+```java
+BookDao{label='2'}
+```
+
+#### @Primary
+
+​		当容器中有多个相同类型的组件可以被自动装备的时候，默认使用被@Primary注解标注的类。
+
+​		修改配置类
+
+```java
+@Primary
+@Bean("bookDao2")
+public BookDao bookDao(){
+    BookDao bookDao = new BookDao();
+    bookDao.setLabel("2");
+    return bookDao;
+}
+```
+
+​		去掉BookService上的@Qualifier注解。
+
+​		运行结果如下所示。
+
+```java
+BookDao{label='2'}
+```
+
+​		需要注意，@Qualifier注解的优先级高于@Primary。
+
+### 没有组件则不装配
+
+​		使用@Autowired的required属性，如果容器中没有找到需要类型的组件，则不进行注入。
+
+```java
+@Autowired(required = false)
+```
+
+### Autowired标注在方法上
+
+#### 创建bean--Boss
+
+​	创建Boss类型，并使用@Component注解标注，把它加入Spring容器。在配置文件中将Boss引入。
+
+```java
+@Component
+public class Boss {
+
+    private Car car;
+
+    public Car getCar() {
+        return car;
+    }
+
+    @Autowired
+    //标注在方法上，Spring容器创建当前对象，就会调用方法，完成赋值
+    //方法使用的参数，自定义类型的值从ioc容器获取
+    public void setCar(Car car) {
+        this.car = car;
+    }
+
+    @Override
+    public String toString() {
+        return "Boss{" +
+                "car=" + car +
+                '}';
+    }
+}
+```
+
+```java
+@Configuration
+@ComponentScan({"com.jolan.com.jolan.controller", "com.jolan.com.jolan.service", "com.jolan.com.jolan.dao", "com.jolan.bean"})
+public class MainConfigOfAutowired {
+    @Primary
+    @Bean("bookDao2")
+    public BookDao bookDao(){
+        BookDao bookDao = new BookDao();
+        bookDao.setLabel("2");
+        return bookDao;
+    }
+}
+```
+
+#### 测试运行
+
+```java
+public class IOCTest_Autowired {
+    AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfigOfAutowired.class);
+    @Test
+    public void test01(){
+        BookService bookService = (BookService)applicationContext.getBean(BookService.class);
+        bookService.print();
+
+//        BookDao bookDao = (BookDao)applicationContext.getBean(BookDao.class);
+//        System.out.println(bookDao);
+        Boss boss = applicationContext.getBean(Boss.class);
+        System.out.println(boss);
+        Car car = applicationContext.getBean(Car.class);
+        System.out.println(car);
+    }
+
+    private void printBeans(AnnotationConfigApplicationContext applicationContext){
+        String[] names = applicationContext.getBeanDefinitionNames();
+        for (String name : names) {
+            System.out.println(name);
+        }
+    }
+}
+```
+
+#### 运行结果
+
+​	可以看到Boss中Car成员变量的值和从Spring容器中直接获取的值是一致的。
+
+```java
+Boss{car=com.jolan.bean.Car@78b66d36}
+com.jolan.bean.Car@78b66d36
+```
+
+### Autowired标注在构造器上
+
+​	修改Boss类并运行。去掉set方法上的Autowired注解，增加构造函数并使用Autowired注解。
+
+```java
+@Component
+public class Boss {
+
+    private Car car;
+
+    //构造器要用的组件，都是从容器中获取
+    @Autowired
+    public Boss(Car car){
+        this.car = car;
+        System.out.println("Boss的有参构造器...");
+    }
+
+    public Car getCar() {
+        return car;
+    }
+
+//    @Autowired
+    //标注在方法上，Spring容器创建当前对象，就会调用方法，完成赋值
+    //方法使用的参数，自定义类型的值从ioc容器获取
+    public void setCar(Car car) {
+        this.car = car;
+    }
+
+    @Override
+    public String toString() {
+        return "Boss{" +
+                "car=" + car +
+                '}';
+    }
+}
+```
+
+​	运行结果:
+
+```java
+Boss{car=com.jolan.bean.Car@363ee3a2}
+com.jolan.bean.Car@363ee3a2
+```
+
+### Autowired标注在参数上
+
+​	改动如下图所示，运行结果一致，此处略过。
+
+```java
+public Boss(@Autowired Car car){
+    this.car = car;
+    System.out.println("Boss的有参构造器...");
+}
+```
+
+### Autowired和@Bean配合使用
+
+#### 修改Color类
+
+​	将Color类中增加成员变量car。
+
+```java
+public class Color {
+    public Car car;
+
+    public Car getCar() {
+        return car;
+    }
+
+    public void setCar(Car car) {
+        this.car = car;
+    }
+
+    @Override
+    public String toString() {
+        return "Color{" +
+                "car=" + car +
+                '}';
+    }
+}
+```
+
+#### MainConfigOfAutowired中增加Colorbean
+
+```java
+//部分代码
+@Bean
+public Color color(Car car){//这里Car前面省略了@Autowired
+    Color color = new Color();
+    color.setCar(car);
+    return color;
+}
+```
+
+#### 修改测试类
+
+```java
+@Test
+public void test01(){
+    BookService bookService = (BookService)applicationContext.getBean(BookService.class);
+    bookService.print();
+
+    //        BookDao bookDao = (BookDao)applicationContext.getBean(BookDao.class);
+    //        System.out.println(bookDao);
+    Boss boss = applicationContext.getBean(Boss.class);
+    System.out.println(boss);
+    Car car = applicationContext.getBean(Car.class);
+    System.out.println(car);
+
+    Color color = applicationContext.getBean(Color.class);
+    System.out.println(color);
+}
+```
+
+#### 运行结果
+
+​	通过运行结果可知，Boss中的Car和Color中的Car对象是同一个，都是从Spring容器中获取的。
+
+```java
+Boss{car=com.jolan.bean.Car@47d90b9e}
+com.jolan.bean.Car@47d90b9e
+Color{car=com.jolan.bean.Car@47d90b9e}
+```
+
+
+
+## @Resource
+
+​		可以和@Autowired一样实现自动装配功能，默认是按照组件名称进行装配，也可以用name属性重新指定：@Resource(name="bookDao2")。不支持@Primary等注解。
+
+## @Inject
+
+​		使用@Inject注解需要先导入maven依赖。
+
+```xml
+<dependency>
+    <groupId>javax.inject</groupId>
+    <artifactId>javax.inject</artifactId>
+    <version>1</version>
+</dependency>
+```
+
 
 
 

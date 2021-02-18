@@ -1,5 +1,7 @@
 package com.jolan.config;
 
+import com.jolan.bean.Car;
+import com.jolan.bean.Color;
 import com.jolan.com.jolan.dao.BookDao;
 import com.sun.org.apache.xerces.internal.impl.dv.xs.BooleanDV;
 import org.springframework.context.annotation.Bean;
@@ -25,10 +27,14 @@ import org.springframework.context.annotation.Primary;
  *          2.@Inject：需要导入javax.inject的包，和Autowired的功能一样。没有required属性。
  *      AutowiredAnnotationBeanPostProccessor：解析完成自动装配功能
  *
- *      3）@Autowired：构造器，参数，方法，属性。
+ *      3）@Autowired：构造器，参数，方法，属性。都是从容器中获取参数组件的值。
+ *          1.标注在方法位置：@Bean+方法参数，参数从容器中获取。默认不写@Autowired都能自动装配
+ *          2.标在构造器上。如果组件只有一个有参构造器，这个有参构造器的@Autowired可以省略，参数位置的组件还是可以自动从容器中获取
+ *          3.放在参数位置
+ *
  */
 @Configuration
-@ComponentScan({"com.jolan.com.jolan.controller", "com.jolan.com.jolan.service", "com.jolan.com.jolan.dao"})
+@ComponentScan({"com.jolan.com.jolan.controller", "com.jolan.com.jolan.service", "com.jolan.com.jolan.dao", "com.jolan.bean"})
 public class MainConfigOfAutowired {
     @Primary
     @Bean("bookDao2")
@@ -36,5 +42,12 @@ public class MainConfigOfAutowired {
         BookDao bookDao = new BookDao();
         bookDao.setLabel("2");
         return bookDao;
+    }
+
+    @Bean
+    public Color color(Car car){
+        Color color = new Color();
+        color.setCar(car);
+        return color;
     }
 }

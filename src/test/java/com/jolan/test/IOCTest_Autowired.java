@@ -1,5 +1,8 @@
 package com.jolan.test;
 
+import com.jolan.bean.Boss;
+import com.jolan.bean.Car;
+import com.jolan.bean.Color;
 import com.jolan.bean.Person;
 import com.jolan.com.jolan.dao.BookDao;
 import com.jolan.com.jolan.service.BookService;
@@ -22,6 +25,13 @@ public class IOCTest_Autowired {
 
 //        BookDao bookDao = (BookDao)applicationContext.getBean(BookDao.class);
 //        System.out.println(bookDao);
+        Boss boss = applicationContext.getBean(Boss.class);
+        System.out.println(boss);
+        Car car = applicationContext.getBean(Car.class);
+        System.out.println(car);
+
+        Color color = applicationContext.getBean(Color.class);
+        System.out.println(color);
     }
 
     private void printBeans(AnnotationConfigApplicationContext applicationContext){
