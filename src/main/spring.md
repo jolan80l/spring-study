@@ -963,7 +963,7 @@ cat ...destroy...
 
 ## JSR250
 
-​		使用JSR250规范记性初始化和销毁工作。
+​		使用JSR250规范进行初始化和销毁工作。
 
 ### 创建类
 
@@ -1541,6 +1541,219 @@ Color{car=com.jolan.bean.Car@47d90b9e}
     <artifactId>javax.inject</artifactId>
     <version>1</version>
 </dependency>
+```
+
+## Aware
+
+​	自定义组件实现xxxAware接口，在创建对象的时候，会调用接口规定的方法注入相关的组件。xxxAware接口的父接口是Aware接口。
+
+### 修改Red类
+
+​	让Red类实现ApplicationContextAware、BeanNameAware、EmbeddedValueResolverAware接口，并且使用@Component注解。
+
+```java
+package com.jolan.bean;
+
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.BeanNameAware;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+import org.springframework.context.EmbeddedValueResolverAware;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringValueResolver;
+
+/**
+ * @author jolan80
+ * @date 2020-08-09 10:23
+ */
+@Component
+public class Red implements ApplicationContextAware, BeanNameAware, EmbeddedValueResolverAware {
+
+    private ApplicationContext applicationContext;
+
+    public void setBeanName(String s) {
+        System.out.println("当前bean的名字：" + s);
+    }
+
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        this.applicationContext = applicationContext;
+        System.out.println("传入的ioc：" + applicationContext);
+    }
+
+    public void setEmbeddedValueResolver(StringValueResolver stringValueResolver) {
+        String resolveStringValue = stringValueResolver.resolveStringValue("你好${os.name} 我是#{20*18}");
+        System.out.println("解析的字符串：" + resolveStringValue);
+    }
+}
+
+```
+
+### 测试运行
+
+​	通过这几个Aware接口，获取到了Spring容器底层的组件。
+
+```java
+当前bean的名字：red
+解析的字符串：你好Windows 8.1 我是360
+传入的ioc：org.springframework.context.annotation.AnnotationConfigApplicationContext@75828a0f, started on Fri Feb 19 22:58:06 CST 2021
+```
+
+# Profile
+
+​	以不同环境切换数据源为例，先给容器注入三个数据源。
+
+## 修改pom文件
+
+​	增加数据源和mysql驱动的坐标依赖。
+
+```xml
+<!-- https://mvnrepository.com/artifact/com.mchange/c3p0 -->
+<dependency>
+    <groupId>com.mchange</groupId>
+    <artifactId>c3p0</artifactId>
+    <version>0.9.5.5</version>
+</dependency>
+
+<!-- https://mvnrepository.com/artifact/mysql/mysql-connector-java -->
+<dependency>
+    <groupId>mysql</groupId>
+    <artifactId>mysql-connector-java</artifactId>
+    <version>8.0.23</version>
+</dependency>
+```
+
+
+
+## 创建dbConfig配置文件
+
+​	在resources根目录下创建配置文件。
+
+![avatar](pic/2.png "增加配置文件")
+
+```properties
+db.user = root
+db.password = 123456
+db.driverClass = com.mysql.jdbc.Driver
+```
+
+
+
+## 创建MainConfigOfProfile配置文件
+
+```java
+package com.jolan.config;
+
+import com.mchange.v2.c3p0.ComboPooledDataSource;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.config.EmbeddedValueResolver;
+import org.springframework.context.EmbeddedValueResolverAware;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.PropertySource;
+import org.springframework.util.StringValueResolver;
+
+import javax.sql.DataSource;
+import java.beans.PropertyVetoException;
+
+/**
+ * @author jolan80
+ * @date 2021-02-19 23:10
+ *
+ * Profile:
+ *  Spring为我们提供的可以根据当前环境，动态的激活和切换一系列组件的功能；
+ *
+ *  如开发环境、测试环境、生产环境
+ */
+@PropertySource("classpath:/dbConfig.properties")
+@Configuration
+public class MainConfigOfProfile implements EmbeddedValueResolverAware {
+
+    @Value("${db.user}")
+    private String user;
+
+    private StringValueResolver stringValueResolver;
+
+    @Bean("devDataSource")
+    public DataSource dataSourceDev(@Value("${db.password}") String pwd) throws PropertyVetoException {
+        ComboPooledDataSource comboPooledDataSource = new ComboPooledDataSource();
+        comboPooledDataSource.setUser(user);
+        comboPooledDataSource.setPassword(pwd);
+        comboPooledDataSource.setJdbcUrl("jdbc:mysql://localhost:3306/dev");
+        comboPooledDataSource.setDriverClass(stringValueResolver.resolveStringValue("${db.driverClass}"));
+        return comboPooledDataSource;
+    }
+
+    @Bean("testDataSource")
+    public DataSource dataSourceTest(@Value("${db.password}") String pwd) throws PropertyVetoException {
+        ComboPooledDataSource comboPooledDataSource = new ComboPooledDataSource();
+        comboPooledDataSource.setUser(user);
+        comboPooledDataSource.setPassword(pwd);
+        comboPooledDataSource.setJdbcUrl("jdbc:mysql://localhost:3306/test");
+        comboPooledDataSource.setDriverClass(stringValueResolver.resolveStringValue("${db.driverClass}"));
+        return comboPooledDataSource;
+    }
+
+    @Bean("prodDataSource")
+    public DataSource dataSourceProd(@Value("${db.password}") String pwd) throws PropertyVetoException {
+        ComboPooledDataSource comboPooledDataSource = new ComboPooledDataSource();
+        comboPooledDataSource.setUser(user);
+        comboPooledDataSource.setPassword(pwd);
+        comboPooledDataSource.setJdbcUrl("jdbc:mysql://localhost:3306/prod");
+        comboPooledDataSource.setDriverClass(stringValueResolver.resolveStringValue("${db.driverClass}"));
+        return comboPooledDataSource;
+    }
+
+    public void setEmbeddedValueResolver(StringValueResolver stringValueResolver) {
+        this.stringValueResolver = stringValueResolver;
+    }
+}
+
+```
+
+## 新增测试类
+
+```java
+package com.jolan.test;
+
+import com.jolan.bean.Boss;
+import com.jolan.bean.Car;
+import com.jolan.bean.Color;
+import com.jolan.com.jolan.service.BookService;
+import com.jolan.config.MainConfigOfAutowired;
+import com.jolan.config.MainConfigOfProfile;
+import org.junit.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+import javax.sql.DataSource;
+
+/**
+ * @author jolan80
+ * @date 2020-08-15 15:16
+ */
+public class IOCTest_Profile {
+
+    @Test
+    public void test01(){
+        AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfigOfProfile.class);
+        String[] namesForType = applicationContext.getBeanNamesForType(DataSource.class);
+        for(String dataSourceName : namesForType){
+            System.out.println(dataSourceName);
+        }
+        applicationContext.close();
+    }
+
+}
+
+```
+
+## 运行结果
+
+​	目前容器中有三个数据源
+
+```java
+devDataSource
+testDataSource
+prodDataSource
 ```
 
 

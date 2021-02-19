@@ -32,6 +32,11 @@ import org.springframework.context.annotation.Primary;
  *          2.标在构造器上。如果组件只有一个有参构造器，这个有参构造器的@Autowired可以省略，参数位置的组件还是可以自动从容器中获取
  *          3.放在参数位置
  *
+ *      4)自定义组件想要使用Spring容器底层的一些组件（ApplicationContext,BeanFactory）
+ *          自定义组件实现xxxAware接口，在创建对象的时候，会调用接口规定的方法注入相关的组件；Aware
+ *          把Spring底层一些组件注入到自定义的bean中
+ *          xxxAware：功能使用xxxProcessor；
+ *              ApplicationContextAware=>ApplicationContextAwareProcessor
  */
 @Configuration
 @ComponentScan({"com.jolan.com.jolan.controller", "com.jolan.com.jolan.service", "com.jolan.com.jolan.dao", "com.jolan.bean"})
