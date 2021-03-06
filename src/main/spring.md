@@ -1,3 +1,5 @@
+
+
 # 导入spring核心包
 
 ​	浏览器打开https://mvnrepository.com/，搜索spring context，找到相应版本点击进入，即可找到对应的maven依赖。
@@ -1756,7 +1758,146 @@ testDataSource
 prodDataSource
 ```
 
+## 激活profile的几种方式
+
+### 使用命令行参数
+
+​	在运行前在命令行参数中增加 -Dspring.profiles.active=test，表示使用test环境。运行结果如下。
+
+```java
+testDataSource
+```
+
+### 在代码中加载
+
+```java
+@Test
+public void test02(){
+    //1.创建一个applicationContext对象
+    AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext();
+    //2.设置需要设置的环境
+    applicationContext.getEnvironment().setActiveProfiles("test", "dev");
+    //3.注册配置类
+    applicationContext.register(MainConfigOfProfile.class);
+    //4.启动刷新容器
+    applicationContext.refresh();
+    String[] namesForType = applicationContext.getBeanNamesForType(DataSource.class);
+    for(String dataSourceName : namesForType){
+        System.out.println(dataSourceName);
+    }
+    applicationContext.close();
+}
+```
+
+​	测试结果如下：加载了test和dev环境的bean。
+
+```java
+devDataSource
+testDataSource
+```
+
+## 其他说明
+
+​	@Profile还可以标注在类上，只有是指定的环境的时候，整个配置类里面的所有配置才能生效。
+
+​	如果要默认加载可以使用@Profile("default")
+
+# AOP
+
+## AOP工作流程
+
+​	1）、传入配置类，创建ioc容器
+
+​	2）、注册配置类，调用refresh()刷新容器
+
+​	3）、registerBeanPostProcessors(beanFactory);注册bean的后置处理器来方便拦截bean的创建
+
+​		①先获取ioc容器中已经定义了需要创建对象的所有BeanPostProcessor
+
+​		②给容器中加别的BeanPostProcessor
+
+​		③优先注册实现了PriorityOrdered接口的BeanPostProcessor
+
+​		④再给容器中注册实现了Ordered接口的BeanPostProcessor
+
+​		⑤注册没实现优先级接口的BeanPostProcessor
+
+​		⑥注册BeanPostProcessor，实际就是创建BeanPostProcessor对象，保存在容器中。
+
+​			创建internalAutoProxyCreator的BeanPostProcessor【AnnotationAwareAspectJAutoProxyCreator】
+
+​			Ⅰ 创建Bean的实例
+
+​			Ⅱ this.populateBean(beanName, mbd, instanceWrapper);//给Bean的各种属性赋值
+
+​			Ⅲ  this.initializeBean(beanName, exposedObject, mbd);//初始化Bean
+
+​				一、this.invokeAwareMethods(beanName, bean);//处理Aware接口的方法回调
+
+​				二、wrappedBean = this.applyBeanPostProcessorsBeforeInitialization(bean, beanName);//应用后置处理器的postProcessBeforeInitialization
+
+​				三、this.invokeInitMethods(beanName, wrappedBean, mbd);//执行自定义的初始化方法
+
+​				四、wrappedBean = this.applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);//执行后置处理器的postProcessAfterInitialization
+
+​			Ⅳ BeanP（AnnotationAwareAspectJAutoProxyCreator）创建成功。
+
+​		⑦把BeanPostProcessor注册到BeanFactory中，beanFactory.addBeanPostProcessor(postProcessor);
+
+​	4）、this.finishBeanFactoryInitialization(beanFactory);//完成BeanFactory初始化工作，创建剩下的单实例Bean
+
+​		①遍历获取容器中所有的Bean，依次创建对象getBean(weaverAwareName);
+
+​			getBean->doGetBean->getSingleton->
+
+​		②创建Bean
+
+​			【AnnotationAwareAspectJAutoProxyCreator在所有bean创建之前会有一个拦截，InstantiationAwareBeanPostProcessor，会调用applyBeanPostProcessorsBeforeInstantiation】
+
+​			Ⅰ 先从缓存中获取当前bean，如果能获取到，说明bean是之前被创建过的，直接使用，否则再创建。只要创建好的Bean都会被缓存起来。
+
+​			Ⅱ createBean()：创建Bean。AnnotationAwareAspectJAutoProxyCreator会在任何Bean创建之前先尝试返回Bean的实例。
+
+​			【BeanPostProcessor是在Bean对象创建完成并初始化前后调用的】
+
+​			【InstantiationAwareBeanPostProcessor是在创建Bean实例之前先尝试用后置处理器返回对象】
+
+​				一、resolveBeforeInstantiation(beanName, mbdToUse);//希望后置处理器在此能返回一个代理对象；如果能返回代理对象就使用，如果不能就继续。
+
+​						第一步：后置处理器先尝试返回对象。
+
+​						applyBeanPostProcessorsBeforeInstantiation(targetType, beanName);//拿到所有后置处理器，如果是InstantiationAwareBeanPostProcessor就执行postProcessBeforeInstantiation
+
+​						applyBeanPostProcessorsAfterInitialization(bean, beanName);
+
+​				二、doCreateBean(beanName, mbdToUse, args);//真正的创建一个Bean实例，和上面的3.6流程一样
+
+## AnnotationAwareAspectJAutoProxyCreator
+
+AnnotationAwareAspectJAutoProxyCreator.postProcessBeforeInstantiation()的作用。
+
+1）在每一个Bean创建之前，调用postProcessBeforeInstantiation。
+
+​	① 判断当前bean是否在advisedBeans中（保存了所有需要增强的bean）
+
+​	② 判断当前bean是否是基础类型：Advice，Pointcut，Advisor，AopInfrastructureBean
+
+​		或者是否是切面（@Aspect）
+
+​	③ 是否需要跳过：
+
+2） 
 
 
 
 
+
+
+
+
+
+
+
+
+
+​			
