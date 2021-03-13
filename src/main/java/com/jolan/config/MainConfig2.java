@@ -11,8 +11,6 @@ import com.jolan.condition.WindowsCondition;
 import org.springframework.context.annotation.*;
 
 
-import javax.jnlp.PersistenceService;
-
 /**
  * @author jolan80
  * @date 2020-08-08 16:32

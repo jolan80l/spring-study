@@ -2,6 +2,7 @@ package com.jolan.tx;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * @author jolan80
@@ -13,6 +14,7 @@ public class UserService {
     @Autowired
     private UserDao userDao;
 
+    @Transactional
     public void inserUser(){
         userDao.insert();
         //otherDao.otherMethod()
