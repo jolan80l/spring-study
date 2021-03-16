@@ -1994,8 +1994,215 @@ AnnotationAwareAspectJAutoProxyCreator.postProcessBeforeInstantiation()的作用
 
 ​				 异常执行：前置通知->目标方法->后置通知->异常通知
 
+# 声明式事物
+
+## 环境搭建
+
+### 导入相关依赖
+
+​	数据源、数据库驱动、springjdbc模块。
+
+```xml
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-jdbc</artifactId>
+    <version>5.2.6.RELEASE</version>
+</dependency>
+
+<dependency>
+    <groupId>com.mchange</groupId>
+    <artifactId>c3p0</artifactId>
+    <version>0.9.5.5</version>
+</dependency>
+
+<dependency>
+    <groupId>mysql</groupId>
+    <artifactId>mysql-connector-java</artifactId>
+    <version>8.0.23</version>
+</dependency>
+
+```
+
+### 配置数据源
+
+​	新建TxConfig配置类。
+
+```java
+@ComponentScan("com.jolan.tx")
+@Configuration
+public class TxConfig {
+
+    //数据源
+    @Bean
+    public DataSource dataSource() throws Exception{
+        ComboPooledDataSource datasource = new ComboPooledDataSource();
+        datasource.setUser("xxx");
+        datasource.setPassword("xxx");
+        datasource.setDriverClass("com.mysql.jdbc.Driver");
+        datasource.setJdbcUrl("jdbc:mysql://xxx:3306/test");
+        return datasource;
+    }
 
 
+    @Bean
+    public JdbcTemplate jdbcTemplate() throws Exception{
+        //Spring对@Configuration类会特殊处理：给容器中加组件的方法，多次调用都只是从容器中找组件
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource());
+        return jdbcTemplate;
+    }
+}
+```
 
+### 新建dao层操作数据库
 
-​			
+​	新建UserDao类
+
+```java
+@Repository
+public class UserDao {
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    public void insert(){
+        String sql = "insert into tbl_user(username, age) values(?, ?)";
+        String userName = UUID.randomUUID().toString().substring(0, 5);
+        jdbcTemplate.update(sql, userName, 19);
+    }
+}
+```
+
+### 新建service层调用dao层
+
+```java
+@Service
+public class UserService {
+
+    @Autowired
+    private UserDao userDao;
+
+    public void inserUser(){
+        userDao.insert();
+        //otherDao.otherMethod()
+        System.out.println("插入完成");
+        int i = 10/0;
+    }
+
+}
+```
+
+### 新建测试类
+
+​	在上面的UserService类中，在执行数据库插入操作之后，执行了除数为0的除法操作，数据库并没有像我们期待的一样进行回归，仍然正常的插入了一条数据。
+
+```java
+public class IOCTest_Tx {
+
+    @Test
+    public void test01(){
+        AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(TxConfig.class);
+        UserService userService = applicationContext.getBean(UserService.class);
+        userService.inserUser();
+        applicationContext.close();
+    }
+}
+```
+
+### 运行结果
+
+```java
+插入完成
+
+java.lang.ArithmeticException: / by zero
+
+	at com.jolan.tx.UserService.inserUser(UserService.java:20)
+	at com.jolan.test.IOCTest_Tx.test01(IOCTest_Tx.java:20)
+	at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:62)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:50)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:47)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:325)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:78)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:57)
+	at org.junit.runners.ParentRunner$3.run(ParentRunner.java:290)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:71)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:288)
+	at org.junit.runners.ParentRunner.access$000(ParentRunner.java:58)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:268)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:363)
+	at org.junit.runner.JUnitCore.run(JUnitCore.java:137)
+	at com.intellij.junit4.JUnit4IdeaTestRunner.startRunnerWithArgs(JUnit4IdeaTestRunner.java:68)
+	at com.intellij.rt.junit.IdeaTestRunner$Repeater.startRunnerWithArgs(IdeaTestRunner.java:33)
+	at com.intellij.rt.junit.JUnitStarter.prepareStreamsAndStart(JUnitStarter.java:230)
+	at com.intellij.rt.junit.JUnitStarter.main(JUnitStarter.java:58)
+```
+
+数据库结果为：1	fc6b1	19
+
+## @Transactional
+
+​	在UserService类上增加@Transactional注解。再次运行事物没有生效。
+
+```java
+@Transactional
+public void inserUser(){
+    userDao.insert();
+    //otherDao.otherMethod()
+    System.out.println("插入完成");
+    int i = 10/0;
+}
+```
+
+## @EnableTransactionManagement
+
+​	@Transactional没有生效是因为没有开启声明式事物，需要在配置类上增加@EnableTransactionManagement标签。
+
+```java
+@EnableTransactionManagement
+@ComponentScan("com.jolan.tx")
+@Configuration
+public class TxConfig 
+```
+
+## PlatformTransactionManager
+
+​	增加开启注解后运行测试类报错，是因为缺少事物管理器管理事物，增加事物管理器Bean，在配置类中增加配置。以上配置完成后再运行测试类型，数据库中将不会插入新的记录。
+
+```java
+@Bean
+public PlatformTransactionManager transactionManager() throws Exception{
+    return new DataSourceTransactionManager(dataSource());
+}
+```
+
+## @EnableTransactionManagement工作原理		
+
+​	1） @EnableTransactionManagement利用TransactionManagementConfigurationSelector给容器中导入组件
+
+​	2） 导入两个组件
+
+​		① AutoProxyRegistrar
+
+​		② ProxyTransactionManagementConfiguration
+
+​	3） AutoProxyRegistrar：给容器中注册一个InfrastructureAdvisorAutoProxyCreator组件
+
+​		  利用后置处理器机制，在对象创建以后，包装对象成一个代理对象（增强器），代理对象执行方法利用拦截器链进行调用
+
+​	4）ProxyTransactionManagementConfiguration
+
+​		① 给容器中注册事物增强器。事物增强器要用事物注解的信息，AnnotationTransactionAttributeSource解析事物注解
+
+​		② 事物拦截器TransactionInterceptor：保存了事物的属性信息，和事物管理器。他是一个MethodInterceptor。
+
+​			 在目标方法执行的时候，执行拦截器链。事物拦截器流程如下。
+
+​			Ⅰ 获取事物属性
+
+​			Ⅱ 再获取PlantformTranscationManager。如果事先没有添加指定任何TranscationManager，最终会从容器中按照类型获取一个PlantformTranscationManager。
+
+​			Ⅲ 执行目标方法，如果一场，获取到事物管理器，利用事物管理器回滚这次操作。如果正常，利用事物管理器提交事物。
