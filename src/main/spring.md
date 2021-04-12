@@ -2206,3 +2206,80 @@ public PlatformTransactionManager transactionManager() throws Exception{
 ​			Ⅱ 再获取PlantformTranscationManager。如果事先没有添加指定任何TranscationManager，最终会从容器中按照类型获取一个PlantformTranscationManager。
 
 ​			Ⅲ 执行目标方法，如果一场，获取到事物管理器，利用事物管理器回滚这次操作。如果正常，利用事物管理器提交事物。
+
+# BeanFactoryPostProcessor
+
+​	和BeanPostProcessor是bean的后置处理器类似，BeanFactoryPostProcessor是BeanFactory的后置处理器。其执行时机是在BeanFactory标准初始化之后调用，即：所有的bean定义已经保存加载到BeanFactory，但是Bean的实例还没有创建。
+
+## 执行说明
+
+​	1）ioc容器创建对象。
+
+​	2）invokeBeanFactoryPostProcessors(beanFactory);执行BeanFactoryPostProcessor
+
+​		如何找到所有的BeanFactoryPostProcessor并执行他们的方法，分下面两个步骤。
+
+​		① 直接在BeanFactory中找到所有类型是BeanFactoryPostProcessor的组件，并且执行他们的方法
+
+​		② 在初始化创建其他组件前面执行
+
+## 创建配置类ExtConfig
+
+​	创建一个配置类，在配置类中注册一个Blue类型的bean。
+
+```java
+@Configuration
+@ComponentScan("com.jolan.ext")
+public class ExtConfig {
+
+    @Bean
+    public Blue blue(){
+        return new Blue();
+    }
+}
+```
+
+## 创建MyBeanFactoryPostProcessor
+
+​	创建MyBeanFactoryPostProcessor，实现BeanFactoryPostProcessor。
+
+```java
+@Component
+public class MyBeanFactoryPostProcessor implements BeanFactoryPostProcessor {
+
+
+    public void postProcessBeanFactory(ConfigurableListableBeanFactory configurableListableBeanFactory) throws BeansException {
+        System.out.println("MyBeanFactoryPostProcessor...postProcessBeanFactory...");
+        int count = configurableListableBeanFactory.getBeanPostProcessorCount();
+        String[] names = configurableListableBeanFactory.getBeanDefinitionNames();
+        System.out.println("当前BeanFactory中有"+count+"个Bean");
+        System.out.println(Arrays.asList(names));
+    }
+}
+```
+
+## 创建测试类并运行
+
+```java
+public class IOCTest_Ext {
+
+    @SuppressWarnings("resource")
+    @Test
+    public void test01(){
+        AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(ExtConfig.class);
+
+        applicationContext.close();
+    }
+
+
+}
+```
+
+​	运行结果如下。可以看到MyBeanFactoryPostProcessor是在Bean实例化之前运行的，并且可以获取到Bean的定义信息。
+
+```java
+MyBeanFactoryPostProcessor...postProcessBeanFactory...
+当前BeanFactory中有3个Bean
+[org.springframework.context.annotation.internalConfigurationAnnotationProcessor, org.springframework.context.annotation.internalAutowiredAnnotationProcessor, org.springframework.context.annotation.internalCommonAnnotationProcessor, org.springframework.context.event.internalEventListenerProcessor, org.springframework.context.event.internalEventListenerFactory, extConfig, myBeanFactoryPostProcessor, blue]
+```
+
