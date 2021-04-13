@@ -20,6 +20,10 @@ import org.springframework.context.annotation.Configuration;
  *      如何找到所有的BeanFactoryPostProcessor并执行他们的方法
  *          ① 直接在BeanFactory中找到所有类型是BeanFactoryPostProcessor的组件，并且执行他们的方法
  *          ② 在初始化创建其他组件前面执行
+ *  3) BeanDefinitionRegistryPostProcessor extends invokeBeanFactoryPostProcessors
+ *      postProcessBeanDefinitionRegistry();
+ *      在所以bean定义信息将要被加载，bean实例还未创建
+ *      优先于BeanFactoryPostProcessor执行，利用BeanDefinitionRegistryPostProcessor给容器中再添加一些组件。
  * */
 @Configuration
 @ComponentScan("com.jolan.ext")
