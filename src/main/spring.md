@@ -2283,3 +2283,60 @@ MyBeanFactoryPostProcessor...postProcessBeanFactory...
 [org.springframework.context.annotation.internalConfigurationAnnotationProcessor, org.springframework.context.annotation.internalAutowiredAnnotationProcessor, org.springframework.context.annotation.internalCommonAnnotationProcessor, org.springframework.context.event.internalEventListenerProcessor, org.springframework.context.event.internalEventListenerFactory, extConfig, myBeanFactoryPostProcessor, blue]
 ```
 
+# BeanDefinitionRegistryPostProcessor
+
+​	BeanDefinitionRegistryPostProcessor是在所有bean定义信息将要被加载，bean实例还未创建时运行。优先于BeanFactoryPostProcessor执行，利用BeanDefinitionRegistryPostProcessor给容器中再添加一些组件。它继承了BeanFactoryPostProcessor。
+
+## 创建MyBeanDefinitionRegistryPostProcessor
+
+​	MyBeanDefinitionRegistryPostProcessor实现了BeanDefinitionRegistryPostProcessor，它有两个需要实现的方法postProcessBeanDefinitionRegistry是来自于BeanDefinitionRegistryPostProcessor，postProcessBeanFactory是来自于BeanDefinitionRegistryPostProcessor继承的BeanFactoryPostProcessor。
+
+​	new RootBeanDefinition(Blue.class)和BeanDefinitionBuilder.rootBeanDefinition(Blue.class).getBeanDefinition()都是创建bean定义的一种方法。
+
+```java
+@Component
+public class MyBeanDefinitionRegistryPostProcessor implements BeanDefinitionRegistryPostProcessor {
+    //BeanDefinitionRegistry Bean定义信息的保存中心，以后的BeanFactory就是按照BeanDefinitionRegistry里面保存的每一个ban定义信息创建bean实例的。
+    public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry beanDefinitionRegistry) throws BeansException {
+        System.out.println("MyBeanDefinitionRegistryPostProcessor...postProcessBeanDefinitionRegistry...bean的数量:" + beanDefinitionRegistry.getBeanDefinitionCount());
+        //下面两种方法都可以创建一个bean定义信息
+        RootBeanDefinition beanDefinition = new RootBeanDefinition(Blue.class);
+        AbstractBeanDefinition beanDefinition1 = BeanDefinitionBuilder.rootBeanDefinition(Blue.class).getBeanDefinition();
+        beanDefinitionRegistry.registerBeanDefinition("hello", beanDefinition);
+    }
+
+    public void postProcessBeanFactory(ConfigurableListableBeanFactory configurableListableBeanFactory) throws BeansException {
+        System.out.println("MyBeanDefinitionRegistryPostProcessor...bean的数量:" + configurableListableBeanFactory.getBeanDefinitionCount());
+    }
+}
+```
+
+## 运行
+
+​	测试类和上一章节相同，运行结果如下。可以看到postProcessBeanDefinitionRegistry的方法优先于postProcessBeanFactory执行。在后者实行时，bean的数量增加了一个，是在postProcessBeanDefinitionRegistry中刚刚创建的bean。
+
+```java
+MyBeanDefinitionRegistryPostProcessor...postProcessBeanDefinitionRegistry...bean的数量:9
+MyBeanDefinitionRegistryPostProcessor...bean的数量:10
+MyBeanFactoryPostProcessor...postProcessBeanFactory...
+当前BeanFactory中有3个Bean
+[org.springframework.context.annotation.internalConfigurationAnnotationProcessor, org.springframework.context.annotation.internalAutowiredAnnotationProcessor, org.springframework.context.annotation.internalCommonAnnotationProcessor, org.springframework.context.event.internalEventListenerProcessor, org.springframework.context.event.internalEventListenerFactory, extConfig, myBeanDefinitionRegistryPostProcessor, myBeanFactoryPostProcessor, blue, hello]
+
+Process finished with exit code 0
+
+```
+
+## 工作原理（执行顺序）
+
+​	1） IOC创建对象
+
+​	2） 执行refresh()方法，然后执行该方法中的invokeBeanFactoryPostProcessors
+
+​	3） invokeBeanFactoryPostProcessors会从容器中获取得所有的BeanDefinitionRegistryPostProcessor组件
+
+​		① 依次触发所有的postProcessBeanDefinitionRegistry()方法
+
+​		② 再来触发postProcessBeanFactory()方法的BeanFactoryPostProcessor
+
+​	4） 再从容器中找到BeanFactoryPostProcessor组件，然后依次触发postProcessFactory()方法（这个就是上面的BeanFactoryPostProcessor组件的功能，它的执行在BeanDefinitionRegistryPostProcessor之后）
+
