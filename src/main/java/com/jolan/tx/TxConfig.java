@@ -32,10 +32,10 @@ public class TxConfig {
     @Bean
     public DataSource dataSource() throws Exception{
         ComboPooledDataSource datasource = new ComboPooledDataSource();
-        datasource.setUser("testwl");
-        datasource.setPassword("YXjaAyO8C4HOMl2rmSHol8GS61");
+        datasource.setUser("111");
+        datasource.setPassword("111");
         datasource.setDriverClass("com.mysql.jdbc.Driver");
-        datasource.setJdbcUrl("jdbc:mysql://mysql-cn-north-1-f32276cd5f014dfb.rds.jdcloud.com:3358/test");
+        datasource.setJdbcUrl("jdbc:mysql://localhost:3358/test");
         return datasource;
     }
 
