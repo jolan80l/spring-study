@@ -1046,6 +1046,36 @@ cat ...afterPropertiesSet...
 postProcessAfterInitialization...cat=>com.jolan.bean.Cat@5bd03f44
 ```
 
+# bean的生命周期2
+
+见com.jolan.lifecycle包、MainPersonLifeCycle类、和PersonLifecycleTest测试类。这里这给出测试结果
+
+```
+BeanFactoryPostProcessor实现类的构造器。。。
+调用BeanFactoryPostProcessor的postProcessBeanFactory方法。。。
+BeanPostProcessor实现类的构造器。。。
+InstantiationAwareBeanPostProcessorAdapter实现类构造器。。。
+调用InstantiationAwareBeanPostProcessor的postProcessBeforeInstantiation方法。。。
+调用InstantiationAwareBeanPostProcessor的postProcessPropertyValues方法。。。
+调用BeanPostProcessor接口的方法postProcessBeforeInitialization对属性进行更改。。。
+调用BeanPostProcessor的postProcessAfterInitialization方法对属性进行更改。。。
+调用InstantiationAwareBeanPostProcessor的postProcessAfterInitialization方法。。。
+调用InstantiationAwareBeanPostProcessor的postProcessBeforeInstantiation方法。。。
+Person的构造方法执行。。。
+调用InstantiationAwareBeanPostProcessor的postProcessPropertyValues方法。。。
+注入age属性。。。
+调用BeanNameAware的setBeanName方法。。。
+调用BeanFactoryAware的setBeanFactory方法。。。
+调用BeanPostProcessor接口的方法postProcessBeforeInitialization对属性进行更改。。。
+调用InitializingBean的afterPropertiesSet方法。。。
+调用自定义的init-method。。。
+调用BeanPostProcessor的postProcessAfterInitialization方法对属性进行更改。。。
+调用InstantiationAwareBeanPostProcessor的postProcessAfterInitialization方法。。。
+Person{name='wql', age=20}
+调用DiposibleBean的destory方法。。。
+调用自定义的destory-method。。。
+```
+
 # BeanPostProcessor小总结
 
 ​		BeanPostProcessor是bean的后置处理器，在bean创建之后做一些后置操作。
@@ -2339,4 +2369,161 @@ Process finished with exit code 0
 ​		② 再来触发postProcessBeanFactory()方法的BeanFactoryPostProcessor
 
 ​	4） 再从容器中找到BeanFactoryPostProcessor组件，然后依次触发postProcessFactory()方法（这个就是上面的BeanFactoryPostProcessor组件的功能，它的执行在BeanDefinitionRegistryPostProcessor之后）
+
+
+# spring实现责任链
+
+责任链模式是设计模式中的一个常用的设计模式。不借助spring实现责任链见笔者的设计模式笔记。但是责任链模式有一个缺点，第一是会增加代码开发的复杂度，第二是需要把一部分逻辑放在客户端（调用者）。spring可以借助两个注解就可以完成，一个是Order注解，一个是@Resource注解。
+
+## 定义接口
+
+首先定义一个接口
+
+```java
+package com.jolan.order;
+
+public interface IHandler {
+    boolean handle();
+}
+```
+
+## 定义实现类
+
+实现类就是责任链中的一个一个的链，他们实现了上面定义的接口，并且每个实现使用Order注解，其值就是未来注入的顺序。Order注解并不保证bean的实例化的顺序，但是可以保证调用的顺序。
+
+```java
+package com.jolan.order;
+
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+
+@Component
+@Order(10)
+public class HandlerImplOne implements IHandler{
+    public boolean handle() {
+        System.out.println("I am handler one");
+        return true;
+    }
+}
+
+```
+
+```java
+package com.jolan.order;
+
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+
+@Component
+@Order(20)
+public class HandlerImplTwo implements IHandler{
+    public boolean handle() {
+        System.out.println("I am handler two");
+        return true;
+    }
+}
+
+```
+
+```java
+package com.jolan.order;
+
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+
+@Component
+@Order(30)
+public class HandlerImplThree implements IHandler{
+    public boolean handle() {
+        System.out.println("I am handler three");
+        return true;
+    }
+}
+
+```
+
+## 调用者
+
+责任链已经定义好了，下面需要一个调用者或者说一个场景来调用这个链。
+
+```java
+package com.jolan.order;
+
+import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+import javax.annotation.Resource;
+import java.util.List;
+
+@Component
+public class HandlerChainInitialization {
+    @Resource
+    private List<IHandler> handlers;
+
+    public void execute(){
+        if (CollectionUtils.isEmpty(handlers)) {
+            return;
+        }
+        for (IHandler handler : handlers) {
+            boolean flag = handler.handle();
+            if (!flag) {
+                return;
+            }
+        }
+    }
+
+}
+```
+
+## 配置类
+
+```java
+package com.jolan.config;
+
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@ComponentScan("com.jolan.order")
+public class MainConfigOfOrder {
+}
+
+```
+
+## 测试类
+
+```java
+package com.jolan.test;
+
+import com.jolan.config.MainConfigOfOrder;
+import com.jolan.order.HandlerChainInitialization;
+import org.junit.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+
+import java.util.Map;
+
+/**
+ * @author jolan80
+ * @date 2020-08-08 15:42
+ */
+
+public class OrderTest {
+
+    @SuppressWarnings("resource")
+    @Test
+    public void test04(){
+        AnnotationConfigApplicationContext applicationContext = new AnnotationConfigApplicationContext(MainConfigOfOrder.class);
+        HandlerChainInitialization initialization = (HandlerChainInitialization)applicationContext.getBean("handlerChainInitialization");
+        initialization.execute();
+    }
+
+
+}
+
+```
+
+## 运行结果
+
+I am handler one
+I am handler two
+I am handler three
 
